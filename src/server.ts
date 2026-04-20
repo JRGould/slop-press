@@ -22,6 +22,11 @@ const app = new Hono();
 
 let loaderTemplateCache: string | null = null;
 async function getLoaderTemplate(): Promise<string> {
+  // Re-read on every request in dev mode so edits to loader.html take effect
+  // without restarting the server (tsx watch only watches .ts files).
+  if (devModeEnabled()) {
+    return readFile(path.join(PUBLIC_DIR, "loader.html"), "utf8");
+  }
   if (loaderTemplateCache) return loaderTemplateCache;
   loaderTemplateCache = await readFile(
     path.join(PUBLIC_DIR, "loader.html"),

@@ -4,7 +4,12 @@
       "Bash(npm install *)",
       "Bash(npx tsc *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(lsof -i :8080 -sTCP:LISTEN -P -n)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8090/)",
+      "Bash(curl -s -i http://localhost:8090/)"
     ]
   }
 }
