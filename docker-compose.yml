@@ -1,0 +1,23 @@
+services:
+  sloppress:
+    build: .
+    # Localhost-only binding: never expose beyond the host machine.
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+      HOST: "0.0.0.0"
+    # Read-only root FS. The only writable path is the bind-mounted state dir.
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./state:/app/state
+    restart: unless-stopped
+    # Minimal capability set.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

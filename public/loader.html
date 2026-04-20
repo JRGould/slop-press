@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SlopPress · thinking…</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root {
+      --bg: #0f1115;
+      --fg: #e6e6e6;
+      --muted: #8a8f98;
+      --accent: #7dd3fc;
+      --card: #161923;
+      --border: #242837;
+      --add: #3fb950;
+      --del: #f85149;
+      --warn: #d29922;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: var(--font-sans); }
+    header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+    header .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    header .title { font-weight: 600; }
+    header .muted { color: var(--muted); margin-left: auto; }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .card > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .card > summary::-webkit-details-marker { display: none; }
+    .card > summary .chev::before { content: "▸"; color: var(--muted); transition: transform 0.15s; display: inline-block; }
+    .card[open] > summary .chev::before { transform: rotate(90deg); }
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #222738;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge.tool { background: #1c3a5c; color: var(--accent); }
+    .badge.think { background: #3b2d1c; color: var(--warn); }
+    .badge.render { background: #1c3b24; color: var(--add); }
+    .badge.err { background: #3b1c1c; color: var(--del); }
+    .card .body {
+      padding: 0 14px 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      color: #c9d1d9;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .card .body code { color: var(--fg); }
+    .diff-add { color: var(--add); }
+    .diff-del { color: var(--del); }
+    .stream { background: #0c0e14; padding: 10px; border-radius: 6px; border: 1px solid var(--border); min-height: 1.5em; }
+    .section-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; margin-bottom: 4px; }
+    .kv { color: var(--muted); }
+    .kv b { color: var(--fg); }
+    footer { padding: 12px 18px; color: var(--muted); font-size: 12px; font-family: var(--font-mono); text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="dot"></span>
+    <span class="title">SlopPress</span>
+    <span class="muted" id="status">connecting…</span>
+  </header>
+  <main id="feed"></main>
+  <footer>dev mode · set <code>SLOPPRESS_DEV_MODE=false</code> to skip the activity panel</footer>
+
+  <script>
+    const rid = "__SLOPPRESS_RID__";
+    const feed = document.getElementById("feed");
+    const statusEl = document.getElementById("status");
+
+    let thinkingCard = null;
+    let thinkingBody = null;
+    let textCard = null;
+    let textBody = null;
+
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      for (const [k, v] of Object.entries(props)) {
+        if (k === "class") node.className = v;
+        else if (k === "html") node.innerHTML = v;
+        else if (k === "text") node.textContent = v;
+        else node.setAttribute(k, v);
+      }
+      for (const c of children) node.appendChild(c);
+      return node;
+    }
+
+    function card(badgeClass, badgeText, summaryText, bodyHtml, open = false) {
+      const c = document.createElement("details");
+      c.className = "card";
+      if (open) c.setAttribute("open", "");
+      const sum = document.createElement("summary");
+      sum.innerHTML =
+        '<span class="chev"></span>' +
+        '<span class="badge ' + badgeClass + '">' + badgeText + '</span>' +
+        '<span>' + escapeHtml(summaryText) + '</span>';
+      c.appendChild(sum);
+      const body = document.createElement("div");
+      body.className = "body";
+      body.innerHTML = bodyHtml;
+      c.appendChild(body);
+      feed.appendChild(c);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      return { card: c, body };
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function renderRequest(req) {
+      const headers = Object.entries(req.headers || {})
+        .map(([k, v]) => escapeHtml(k) + ": " + escapeHtml(v))
+        .join("\n");
+      const body = req.body ? "\n\n" + escapeHtml(req.body) : "";
+      card(
+        "",
+        "REQUEST",
+        req.method + " " + req.url,
+        "<code>" + escapeHtml(req.method) + " " + escapeHtml(req.url) + "</code>\n" + headers + body,
+        true,
+      );
+    }
+
+    function renderLlmRequest(ev) {
+      const count = Array.isArray(ev.messages) ? ev.messages.length : 0;
+      card(
+        "",
+        "LLM CALL",
+        ev.model + " · " + count + " messages",
+        "<span class=\"kv\">model</span> <b>" + escapeHtml(ev.model) + "</b>\n" +
+          "<span class=\"kv\">messages</span> " + count + "\n" +
+          "<span class=\"kv\">tools</span> " + (Array.isArray(ev.tools) ? ev.tools.length : 0),
+      );
+    }
+
+    function appendDelta(kind, text) {
+      if (kind === "thinking") {
+        if (!thinkingCard) {
+          const r = card("think", "THINKING", "(streaming)", "<div class=\"stream\"></div>", true);
+          thinkingCard = r.card;
+          thinkingBody = r.body.querySelector(".stream");
+        }
+        thinkingBody.textContent += text;
+      } else {
+        if (!textCard) {
+          const r = card("", "ASSISTANT TEXT", "(streaming)", "<div class=\"stream\"></div>", true);
+          textCard = r.card;
+          textBody = r.body.querySelector(".stream");
+        }
+        textBody.textContent += text;
+      }
+      window.scrollTo({ top: document.body.scrollHeight });
+    }
+
+    function renderToolCall(ev) {
+      let argsStr;
+      try { argsStr = JSON.stringify(ev.args, null, 2); } catch { argsStr = String(ev.args); }
+      const short = argsStr.length > 200 ? argsStr.slice(0, 200) + "…" : argsStr;
+      card(
+        "tool",
+        "TOOL CALL",
+        ev.name,
+        "<span class=\"kv\">id</span> " + escapeHtml(ev.id) + "\n" +
+          "<span class=\"section-title\">arguments</span>\n" + escapeHtml(argsStr),
+      );
+    }
+
+    function renderToolResult(ev) {
+      let resStr;
+      try { resStr = JSON.stringify(ev.result, null, 2); } catch { resStr = String(ev.result); }
+      card(
+        "tool",
+        "TOOL RESULT",
+        ev.name,
+        escapeHtml(resStr),
+      );
+    }
+
+    function renderStateWrite(ev) {
+      const diffLines = ev.diff.split("\n").map((line) => {
+        if (line.startsWith("+")) return '<span class="diff-add">' + escapeHtml(line) + "</span>";
+        if (line.startsWith("-")) return '<span class="diff-del">' + escapeHtml(line) + "</span>";
+        return escapeHtml(line);
+      }).join("\n");
+      card(
+        "",
+        "STATE WRITE",
+        ev.file,
+        diffLines,
+      );
+    }
+
+    function renderFinal(ev) {
+      const r = ev.response;
+      const cookies = (r.set_cookies || []).join("\n");
+      card(
+        "render",
+        "RENDER",
+        "status " + r.status + " · " + (r.body || "").length + " bytes",
+        "<span class=\"kv\">status</span> <b>" + r.status + "</b>\n" +
+          "<span class=\"section-title\">headers</span>\n" +
+          escapeHtml(JSON.stringify(r.headers || {}, null, 2)) +
+          (cookies ? "\n<span class=\"section-title\">set-cookies</span>\n" + escapeHtml(cookies) : "") +
+          "\n<span class=\"section-title\">body (first 500)</span>\n" + escapeHtml((r.body || "").slice(0, 500)),
+        true,
+      );
+      statusEl.textContent = "done · swapping document…";
+      setTimeout(() => swapDocument(r), 400);
+    }
+
+    function renderError(ev) {
+      card("err", "ERROR", "", escapeHtml(ev.message || "unknown"));
+      statusEl.textContent = "error";
+    }
+
+    function swapDocument(r) {
+      // Apply any cookies the LLM asked us to set. HttpOnly cannot be set from
+      // JS — acceptable for a localhost dev toy.
+      for (const raw of r.set_cookies || []) {
+        try { document.cookie = raw; } catch {}
+      }
+      // Redirects: follow via location.
+      const loc = (r.headers && (r.headers.Location || r.headers.location)) || null;
+      if (r.status >= 300 && r.status < 400 && loc) {
+        window.location.href = loc;
+        return;
+      }
+      // Otherwise: replace the document with the rendered body.
+      document.open();
+      document.write(r.body || "");
+      document.close();
+    }
+
+    const src = new EventSource("/__slop/stream?rid=" + encodeURIComponent(rid));
+
+    src.addEventListener("open", () => { statusEl.textContent = "streaming…"; });
+
+    function onMessage(raw) {
+      let ev;
+      try { ev = JSON.parse(raw); } catch { return; }
+      switch (ev.type) {
+        case "request": renderRequest(ev.request); break;
+        case "llm_request": renderLlmRequest(ev); thinkingCard = null; textCard = null; break;
+        case "thinking_delta": appendDelta("thinking", ev.text); break;
+        case "llm_delta": appendDelta("text", ev.text); break;
+        case "tool_call": renderToolCall(ev); break;
+        case "tool_result": renderToolResult(ev); break;
+        case "state_write": renderStateWrite(ev); break;
+        case "render": renderFinal(ev); src.close(); break;
+        case "error": renderError(ev); src.close(); break;
+      }
+    }
+
+    src.onmessage = (e) => onMessage(e.data);
+    for (const t of ["request","llm_request","llm_delta","thinking_delta","tool_call","tool_result","state_write","render","error"]) {
+      src.addEventListener(t, (e) => onMessage(e.data));
+    }
+    src.onerror = () => { statusEl.textContent = "connection lost"; };
+  </script>
+</body>
+</html>
