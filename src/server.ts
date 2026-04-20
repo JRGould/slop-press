@@ -6,6 +6,7 @@ import path from "node:path";
 
 import type { IncomingRequest } from "./events.js";
 import { handleRequest } from "./handler.js";
+import { serveImage } from "./images.js";
 import {
   devModeEnabled,
   renderLoaderHtml,
@@ -28,6 +29,40 @@ async function getLoaderTemplate(): Promise<string> {
   );
   return loaderTemplateCache;
 }
+
+app.get("/__images/:filename", async (c) => {
+  const filename = c.req.param("filename");
+  const image = await serveImage(filename);
+  if (!image) return c.text("not found", 404);
+  return new Response(image.data.buffer as ArrayBuffer, {
+    headers: {
+      "Content-Type": image.contentType,
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+});
+
+app.post("/__slop/submit", async (c) => {
+  let body: {
+    method: string;
+    url: string;
+    body?: string;
+    headers?: Record<string, string>;
+  };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid JSON" }, 400);
+  }
+  const request: IncomingRequest = {
+    method: (body.method ?? "GET").toUpperCase(),
+    url: body.url ?? "/",
+    headers: body.headers ?? {},
+    body: body.body ?? null,
+  };
+  const rid = stashRequest(request);
+  return c.json({ rid });
+});
 
 app.get("/__slop/stream", (c) => {
   const rid = c.req.query("rid");

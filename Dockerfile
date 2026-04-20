@@ -15,4 +15,4 @@ RUN chown -R slop:slop /app
 USER slop
 EXPOSE 8080
 ENV NODE_ENV=production
-CMD ["node", "--import", "tsx", "src/server.ts"]
+CMD ["node", "--disable-warning=DEP0040", "--import", "tsx", "src/server.ts"]

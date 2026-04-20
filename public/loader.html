@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>SlopPress · thinking…</title>
+  <title>SlopPress dev</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     :root {
@@ -10,300 +10,510 @@
       --fg: #e6e6e6;
       --muted: #8a8f98;
       --accent: #7dd3fc;
-      --card: #161923;
+      --card-bg: #161923;
       --border: #242837;
       --add: #3fb950;
       --del: #f85149;
       --warn: #d29922;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --tool-bg: #0d2033;
+      --tool-fg: var(--accent);
+      --think-bg: #1f1806;
+      --think-fg: var(--warn);
+      --render-bg: #0c2014;
+      --render-fg: var(--add);
+      --err-bg: #200c0c;
+      --err-fg: var(--del);
+      --panel-w: 400px;
+      --header-h: 38px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: var(--font-sans); }
-    header {
-      padding: 12px 18px;
-      border-bottom: 1px solid var(--border);
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
+
+    .shell {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      font-family: var(--font-mono);
-      font-size: 13px;
+      height: 100vh;
+      width: 100vw;
     }
-    header .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 10px var(--accent);
-      animation: pulse 1.2s ease-in-out infinite;
+
+    /* ── Page frame ─────────────────────────────────────────── */
+    #page-frame {
+      flex: 1 1 0;
+      min-width: 0;
+      border: none;
+      background: #fff;
     }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-    header .title { font-weight: 600; }
-    header .muted { color: var(--muted); margin-left: auto; }
-    main {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 20px;
+
+    /* ── Panel ──────────────────────────────────────────────── */
+    #panel {
+      width: var(--panel-w);
+      flex: 0 0 var(--panel-w);
+      background: var(--bg);
+      border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      gap: 12px;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
       overflow: hidden;
+      transition: flex-basis 0.15s ease, width 0.15s ease;
+      font-family: var(--mono);
+      font-size: 12px;
     }
-    .card > summary {
-      cursor: pointer;
-      list-style: none;
-      padding: 10px 14px;
+    #panel.collapsed {
+      width: 30px;
+      flex-basis: 30px;
+    }
+
+    .panel-header {
+      height: var(--header-h);
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-family: var(--font-mono);
-      font-size: 12px;
+      gap: 8px;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
-    .card > summary::-webkit-details-marker { display: none; }
-    .card > summary .chev::before { content: "▸"; color: var(--muted); transition: transform 0.15s; display: inline-block; }
-    .card[open] > summary .chev::before { transform: rotate(90deg); }
+    .panel-header .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      flex-shrink: 0;
+    }
+    .panel-header .dot.idle { background: var(--muted); box-shadow: none; animation: none; }
+    .panel-header .dot { animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.25} }
+    .panel-header .title { font-weight: 600; color: var(--fg); font-size: 12px; white-space: nowrap; overflow: hidden; }
+    .panel-header .status { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+    .toggle-btn {
+      margin-left: auto;
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 14px; padding: 2px 4px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .toggle-btn:hover { color: var(--fg); }
+    #panel.collapsed .panel-header .title,
+    #panel.collapsed .panel-header .status { display: none; }
+    #panel.collapsed .panel-header .dot { display: none; }
+    #panel.collapsed .toggle-btn { margin-left: 0; }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+    }
+    #panel.collapsed .panel-body { display: none; }
+
+    /* ── Request groups ─────────────────────────────────────── */
+    .req-group {
+      border-bottom: 1px solid var(--border);
+    }
+    .req-group-header {
+      padding: 8px 10px;
+      background: #0c0f18;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .req-group-header:hover { background: #13172a; }
+    .req-group-header .method {
+      font-size: 10px; font-weight: 700; padding: 1px 5px;
+      border-radius: 3px; letter-spacing: .5px;
+      background: #1a2540; color: var(--accent);
+    }
+    .req-group-header .path { color: var(--fg); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .req-group-header .chev { color: var(--muted); font-size: 10px; flex-shrink: 0; }
+    .req-group-body { display: none; }
+    .req-group.open .req-group-body { display: block; }
+    .req-group.open .req-group-header .chev::before { content: "▾"; }
+    .req-group-header .chev::before { content: "▸"; }
+
+    /* ── Event cards ────────────────────────────────────────── */
+    .ev {
+      border-bottom: 1px solid #1a1f2e;
+    }
+    .ev summary {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    .ev summary::-webkit-details-marker { display: none; }
+    .ev summary:hover { background: rgba(255,255,255,.03); }
+    .ev > summary .chev { color: var(--muted); font-size: 10px; width: 10px; flex-shrink: 0; }
+    .ev[open] > summary .chev::before { content: "▾"; }
+    .ev > summary .chev::before { content: "▸"; }
+
     .badge {
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: #222738;
-      color: var(--muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+      text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
+      flex-shrink: 0;
     }
-    .badge.tool { background: #1c3a5c; color: var(--accent); }
-    .badge.think { background: #3b2d1c; color: var(--warn); }
-    .badge.render { background: #1c3b24; color: var(--add); }
-    .badge.err { background: #3b1c1c; color: var(--del); }
-    .card .body {
-      padding: 0 14px 12px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      line-height: 1.5;
+    .badge-req    { background: #1a2540; color: var(--accent); }
+    .badge-llm    { background: #1e1e30; color: #a78bfa; }
+    .badge-think  { background: var(--think-bg); color: var(--think-fg); }
+    .badge-text   { background: #162020; color: #6ee7b7; }
+    .badge-tool   { background: var(--tool-bg); color: var(--tool-fg); }
+    .badge-result { background: #0f1f0f; color: #86efac; }
+    .badge-state  { background: #1a1200; color: var(--warn); }
+    .badge-render { background: var(--render-bg); color: var(--render-fg); }
+    .badge-err    { background: var(--err-bg); color: var(--err-fg); }
+
+    .ev .label { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+
+    .ev .body {
+      padding: 0 10px 8px 10px;
       color: #c9d1d9;
-      white-space: pre-wrap;
-      word-break: break-word;
     }
-    .card .body code { color: var(--fg); }
+    .ev .body pre {
+      margin: 4px 0 0;
+      background: #0c0e14;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 11px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .ev .body .label2 { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; margin-top: 6px; }
     .diff-add { color: var(--add); }
     .diff-del { color: var(--del); }
-    .stream { background: #0c0e14; padding: 10px; border-radius: 6px; border: 1px solid var(--border); min-height: 1.5em; }
-    .section-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; margin-bottom: 4px; }
-    .kv { color: var(--muted); }
-    .kv b { color: var(--fg); }
-    footer { padding: 12px 18px; color: var(--muted); font-size: 12px; font-family: var(--font-mono); text-align: center; }
+    .stream-pre { min-height: 1.4em; }
   </style>
 </head>
 <body>
-  <header>
-    <span class="dot"></span>
-    <span class="title">SlopPress</span>
-    <span class="muted" id="status">connecting…</span>
-  </header>
-  <main id="feed"></main>
-  <footer>dev mode · set <code>SLOPPRESS_DEV_MODE=false</code> to skip the activity panel</footer>
+  <div class="shell">
+    <iframe id="page-frame" title="Rendered page"></iframe>
+    <aside id="panel">
+      <div class="panel-header">
+        <span class="dot" id="status-dot"></span>
+        <span class="title">SlopPress</span>
+        <span class="status" id="status-text">connecting…</span>
+        <button class="toggle-btn" id="toggle-btn" title="Toggle panel">◀</button>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
+    </aside>
+  </div>
 
   <script>
-    const rid = "__SLOPPRESS_RID__";
-    const feed = document.getElementById("feed");
-    const statusEl = document.getElementById("status");
+    const INITIAL_RID = "__SLOPPRESS_RID__";
+    const panel = document.getElementById("panel");
+    const panelBody = document.getElementById("panel-body");
+    const statusDot = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+    const toggleBtn = document.getElementById("toggle-btn");
+    const pageFrame = document.getElementById("page-frame");
 
-    let thinkingCard = null;
-    let thinkingBody = null;
-    let textCard = null;
-    let textBody = null;
+    // ── Panel collapse ──────────────────────────────────────────
+    let panelCollapsed = false;
+    function togglePanel() {
+      panelCollapsed = !panelCollapsed;
+      panel.classList.toggle("collapsed", panelCollapsed);
+      toggleBtn.textContent = panelCollapsed ? "▶" : "◀";
+    }
+    toggleBtn.addEventListener("click", togglePanel);
 
-    function el(tag, props = {}, children = []) {
-      const node = document.createElement(tag);
-      for (const [k, v] of Object.entries(props)) {
-        if (k === "class") node.className = v;
-        else if (k === "html") node.innerHTML = v;
-        else if (k === "text") node.textContent = v;
-        else node.setAttribute(k, v);
-      }
-      for (const c of children) node.appendChild(c);
-      return node;
+    // ── Utilities ───────────────────────────────────────────────
+    function esc(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    function card(badgeClass, badgeText, summaryText, bodyHtml, open = false) {
-      const c = document.createElement("details");
-      c.className = "card";
-      if (open) c.setAttribute("open", "");
-      const sum = document.createElement("summary");
-      sum.innerHTML =
-        '<span class="chev"></span>' +
-        '<span class="badge ' + badgeClass + '">' + badgeText + '</span>' +
-        '<span>' + escapeHtml(summaryText) + '</span>';
-      c.appendChild(sum);
-      const body = document.createElement("div");
-      body.className = "body";
-      body.innerHTML = bodyHtml;
-      c.appendChild(body);
-      feed.appendChild(c);
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-      return { card: c, body };
+    function jsonPre(v) {
+      let s;
+      try { s = typeof v === "string" ? v : JSON.stringify(v, null, 2); }
+      catch { s = String(v); }
+      return "<pre>" + esc(s) + "</pre>";
     }
 
-    function escapeHtml(s) {
-      return String(s)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+    function setStatus(text, streaming) {
+      statusText.textContent = text;
+      statusDot.classList.toggle("idle", !streaming);
     }
 
-    function renderRequest(req) {
-      const headers = Object.entries(req.headers || {})
-        .map(([k, v]) => escapeHtml(k) + ": " + escapeHtml(v))
-        .join("\n");
-      const body = req.body ? "\n\n" + escapeHtml(req.body) : "";
-      card(
-        "",
-        "REQUEST",
-        req.method + " " + req.url,
-        "<code>" + escapeHtml(req.method) + " " + escapeHtml(req.url) + "</code>\n" + headers + body,
-        true,
-      );
+    // ── Request group ───────────────────────────────────────────
+    let currentGroup = null;
+
+    function openGroup(method, url) {
+      // Collapse the previous group
+      if (currentGroup) currentGroup.classList.remove("open");
+
+      const g = document.createElement("div");
+      g.className = "req-group open";
+      g.innerHTML =
+        '<div class="req-group-header">' +
+          '<span class="method">' + esc(method) + '</span>' +
+          '<span class="path">' + esc(url) + '</span>' +
+          '<span class="chev"></span>' +
+        '</div>' +
+        '<div class="req-group-body"></div>';
+      g.querySelector(".req-group-header").addEventListener("click", () => {
+        g.classList.toggle("open");
+      });
+      panelBody.appendChild(g);
+      currentGroup = g;
+      panelBody.scrollTop = panelBody.scrollHeight;
+      return g.querySelector(".req-group-body");
     }
 
-    function renderLlmRequest(ev) {
-      const count = Array.isArray(ev.messages) ? ev.messages.length : 0;
-      card(
-        "",
-        "LLM CALL",
-        ev.model + " · " + count + " messages",
-        "<span class=\"kv\">model</span> <b>" + escapeHtml(ev.model) + "</b>\n" +
-          "<span class=\"kv\">messages</span> " + count + "\n" +
-          "<span class=\"kv\">tools</span> " + (Array.isArray(ev.tools) ? ev.tools.length : 0),
-      );
+    let groupBody = null;
+
+    function addCard(badgeClass, badgeText, labelText, bodyHtml, open) {
+      const d = document.createElement("details");
+      d.className = "ev";
+      if (open) d.setAttribute("open", "");
+      d.innerHTML =
+        '<summary>' +
+          '<span class="chev"></span>' +
+          '<span class="badge ' + badgeClass + '">' + esc(badgeText) + '</span>' +
+          '<span class="label">' + esc(labelText) + '</span>' +
+        '</summary>' +
+        '<div class="body">' + bodyHtml + '</div>';
+      (groupBody ?? panelBody).appendChild(d);
+      panelBody.scrollTop = panelBody.scrollHeight;
+      return d;
+    }
+
+    // ── Streaming delta cards ───────────────────────────────────
+    let thinkCard = null, thinkPre = null;
+    let textCard = null, textPre = null;
+
+    function resetStream() {
+      thinkCard = null; thinkPre = null;
+      textCard = null; textPre = null;
     }
 
     function appendDelta(kind, text) {
       if (kind === "thinking") {
-        if (!thinkingCard) {
-          const r = card("think", "THINKING", "(streaming)", "<div class=\"stream\"></div>", true);
-          thinkingCard = r.card;
-          thinkingBody = r.body.querySelector(".stream");
+        if (!thinkCard) {
+          thinkCard = addCard("badge-think", "Thinking", "(streaming)", '<pre class="stream-pre"></pre>', true);
+          thinkPre = thinkCard.querySelector("pre");
         }
-        thinkingBody.textContent += text;
+        thinkPre.textContent += text;
       } else {
         if (!textCard) {
-          const r = card("", "ASSISTANT TEXT", "(streaming)", "<div class=\"stream\"></div>", true);
-          textCard = r.card;
-          textBody = r.body.querySelector(".stream");
+          textCard = addCard("badge-text", "Text", "(streaming)", '<pre class="stream-pre"></pre>', true);
+          textPre = textCard.querySelector("pre");
         }
-        textBody.textContent += text;
+        textPre.textContent += text;
       }
-      window.scrollTo({ top: document.body.scrollHeight });
+      panelBody.scrollTop = panelBody.scrollHeight;
     }
 
-    function renderToolCall(ev) {
+    // ── Event renderers ─────────────────────────────────────────
+    function onEvRequest(ev) {
+      const r = ev.request;
+      groupBody = openGroup(r.method, r.url);
+      resetStream();
+
+      const hdrs = Object.entries(r.headers || {}).map(([k,v]) => k + ": " + v).join("\n");
+      const body2 = r.body ? "\n\n" + r.body : "";
+      addCard("badge-req", "Request", r.method + " " + r.url,
+        '<pre>' + esc(r.method + " " + r.url + " HTTP/1.1\n" + hdrs + body2) + '</pre>',
+        false);
+    }
+
+    function onEvLlmRequest(ev) {
+      const msgCount = Array.isArray(ev.messages) ? ev.messages.length : 0;
+      // Show the last user message content in full (that's the interesting one — the request envelope).
+      let detail = "";
+      if (Array.isArray(ev.messages)) {
+        for (let i = ev.messages.length - 1; i >= 0; i--) {
+          const m = ev.messages[i];
+          if (m && m.role === "user" && typeof m.content === "string") {
+            detail = '<div class="label2">User message</div><pre>' + esc(m.content) + '</pre>';
+            break;
+          }
+        }
+      }
+      addCard("badge-llm", "LLM call", ev.model + " · " + msgCount + " msgs",
+        '<pre>model: ' + esc(ev.model) + '\nmessages: ' + msgCount + '\ntools: ' +
+          (Array.isArray(ev.tools) ? ev.tools.map(t => t.function?.name).join(", ") : "?") + '</pre>' +
+          detail,
+        false);
+      resetStream();
+    }
+
+    function onEvToolCall(ev) {
       let argsStr;
       try { argsStr = JSON.stringify(ev.args, null, 2); } catch { argsStr = String(ev.args); }
-      const short = argsStr.length > 200 ? argsStr.slice(0, 200) + "…" : argsStr;
-      card(
-        "tool",
-        "TOOL CALL",
-        ev.name,
-        "<span class=\"kv\">id</span> " + escapeHtml(ev.id) + "\n" +
-          "<span class=\"section-title\">arguments</span>\n" + escapeHtml(argsStr),
-      );
+      addCard("badge-tool", "Tool call", ev.name,
+        '<pre>' + esc("id: " + ev.id + "\nname: " + ev.name + "\nargs:\n" + argsStr) + '</pre>',
+        true);
     }
 
-    function renderToolResult(ev) {
+    function onEvToolResult(ev) {
       let resStr;
       try { resStr = JSON.stringify(ev.result, null, 2); } catch { resStr = String(ev.result); }
-      card(
-        "tool",
-        "TOOL RESULT",
-        ev.name,
-        escapeHtml(resStr),
-      );
+      addCard("badge-result", "Tool result", ev.name,
+        '<pre>' + esc(resStr) + '</pre>',
+        false);
     }
 
-    function renderStateWrite(ev) {
-      const diffLines = ev.diff.split("\n").map((line) => {
-        if (line.startsWith("+")) return '<span class="diff-add">' + escapeHtml(line) + "</span>";
-        if (line.startsWith("-")) return '<span class="diff-del">' + escapeHtml(line) + "</span>";
-        return escapeHtml(line);
+    function onEvStateWrite(ev) {
+      const diffHtml = ev.diff.split("\n").map(line => {
+        if (line.startsWith("+")) return '<span class="diff-add">' + esc(line) + '</span>';
+        if (line.startsWith("-")) return '<span class="diff-del">' + esc(line) + '</span>';
+        return esc(line);
       }).join("\n");
-      card(
-        "",
-        "STATE WRITE",
-        ev.file,
-        diffLines,
-      );
+      addCard("badge-state", "State write", ev.file,
+        '<pre>' + diffHtml + '</pre>',
+        true);
     }
 
-    function renderFinal(ev) {
+    function onEvRender(ev) {
       const r = ev.response;
-      const cookies = (r.set_cookies || []).join("\n");
-      card(
-        "render",
-        "RENDER",
-        "status " + r.status + " · " + (r.body || "").length + " bytes",
-        "<span class=\"kv\">status</span> <b>" + r.status + "</b>\n" +
-          "<span class=\"section-title\">headers</span>\n" +
-          escapeHtml(JSON.stringify(r.headers || {}, null, 2)) +
-          (cookies ? "\n<span class=\"section-title\">set-cookies</span>\n" + escapeHtml(cookies) : "") +
-          "\n<span class=\"section-title\">body (first 500)</span>\n" + escapeHtml((r.body || "").slice(0, 500)),
-        true,
-      );
-      statusEl.textContent = "done · swapping document…";
-      setTimeout(() => swapDocument(r), 400);
+      const cookieStr = (r.set_cookies || []).join("\n");
+      addCard("badge-render", "Render", "status " + r.status + " · " + (r.body || "").length + " bytes",
+        '<pre>' + esc(
+          "status: " + r.status + "\n" +
+          "headers: " + JSON.stringify(r.headers || {}, null, 2) +
+          (cookieStr ? "\nset-cookies:\n" + cookieStr : "") +
+          "\nbody (" + (r.body || "").length + " bytes):\n" + (r.body || "").slice(0, 800)
+        ) + '</pre>',
+        true);
+      setStatus("rendered · " + r.status, false);
+      applyRender(r);
     }
 
-    function renderError(ev) {
-      card("err", "ERROR", "", escapeHtml(ev.message || "unknown"));
-      statusEl.textContent = "error";
+    function onEvError(ev) {
+      addCard("badge-err", "Error", ev.message || "unknown",
+        '<pre>' + esc(ev.message || "unknown error") + '</pre>',
+        true);
+      setStatus("error", false);
     }
 
-    function swapDocument(r) {
-      // Apply any cookies the LLM asked us to set. HttpOnly cannot be set from
-      // JS — acceptable for a localhost dev toy.
+    // ── Apply render to iframe ──────────────────────────────────
+    function applyRender(r) {
+      // Set cookies (HttpOnly not possible from JS — acceptable for localhost dev).
       for (const raw of r.set_cookies || []) {
         try { document.cookie = raw; } catch {}
       }
-      // Redirects: follow via location.
-      const loc = (r.headers && (r.headers.Location || r.headers.location)) || null;
+
+      const loc = r.headers && (r.headers.Location || r.headers.location);
       if (r.status >= 300 && r.status < 400 && loc) {
-        window.location.href = loc;
+        // Redirect: navigate via the interception layer rather than assigning
+        // to the iframe so we show the next request in the panel.
+        navigate("GET", loc, null, {});
         return;
       }
-      // Otherwise: replace the document with the rendered body.
-      document.open();
-      document.write(r.body || "");
-      document.close();
+
+      // Inject the navigation-interception script right before </body>.
+      const injected = injectInterceptor(r.body || "");
+      pageFrame.srcdoc = injected;
+      pageFrame.onload = () => attachIframeInterceptors();
     }
 
-    const src = new EventSource("/__slop/stream?rid=" + encodeURIComponent(rid));
+    function injectInterceptor(html) {
+      const script = `<script data-sloppress>
+(function(){
+  function relay(method,url,body,hdrs){
+    window.parent.postMessage({type:'slop-nav',method,url,body,headers:hdrs},'*');
+  }
+  document.addEventListener('click',function(e){
+    var a=e.target.closest('a[href]');
+    if(!a)return;
+    var href=a.getAttribute('href');
+    if(!href||href.startsWith('#')||href.startsWith('javascript')||a.target==='_blank')return;
+    e.preventDefault();e.stopPropagation();
+    relay('GET',a.href,null,{});
+  },true);
+  document.addEventListener('submit',function(e){
+    e.preventDefault();e.stopPropagation();
+    var f=e.target,method=(f.method||'get').toUpperCase();
+    var action=f.action||window.location.href;
+    if(method==='GET'){
+      var p=new URLSearchParams(new FormData(f));
+      var u=new URL(action);u.search=p.toString();
+      relay('GET',u.href,null,{});
+    }else{
+      var body=new URLSearchParams(new FormData(f)).toString();
+      relay('POST',action,body,{'content-type':'application/x-www-form-urlencoded'});
+    }
+  },true);
+})();
+<\/script>`;
+      // Insert before </body> if present, otherwise append.
+      const idx = html.lastIndexOf("</body>");
+      return idx >= 0 ? html.slice(0, idx) + script + html.slice(idx) : html + script;
+    }
 
-    src.addEventListener("open", () => { statusEl.textContent = "streaming…"; });
+    function attachIframeInterceptors() {
+      // postMessage listener is already set up globally below.
+      // Nothing else needed — the injected script does the work.
+    }
 
-    function onMessage(raw) {
-      let ev;
-      try { ev = JSON.parse(raw); } catch { return; }
-      switch (ev.type) {
-        case "request": renderRequest(ev.request); break;
-        case "llm_request": renderLlmRequest(ev); thinkingCard = null; textCard = null; break;
-        case "thinking_delta": appendDelta("thinking", ev.text); break;
-        case "llm_delta": appendDelta("text", ev.text); break;
-        case "tool_call": renderToolCall(ev); break;
-        case "tool_result": renderToolResult(ev); break;
-        case "state_write": renderStateWrite(ev); break;
-        case "render": renderFinal(ev); src.close(); break;
-        case "error": renderError(ev); src.close(); break;
+    window.addEventListener("message", (e) => {
+      if (!e.data || e.data.type !== "slop-nav") return;
+      const { method, url, body, headers } = e.data;
+      try {
+        const u = new URL(url);
+        navigate(method, u.pathname + u.search, body || null, headers || {});
+      } catch {
+        navigate(method, url, body || null, headers || {});
       }
+    });
+
+    // ── SSE stream management ────────────────────────────────────
+    let currentSrc = null;
+
+    function openStream(rid) {
+      if (currentSrc) { try { currentSrc.close(); } catch {} currentSrc = null; }
+      setStatus("streaming…", true);
+      const src = new EventSource("/__slop/stream?rid=" + encodeURIComponent(rid));
+      currentSrc = src;
+
+      function dispatch(data) {
+        let ev;
+        try { ev = JSON.parse(data); } catch { return; }
+        switch (ev.type) {
+          case "request":       onEvRequest(ev);     break;
+          case "llm_request":   onEvLlmRequest(ev);  break;
+          case "thinking_delta": appendDelta("thinking", ev.text); break;
+          case "llm_delta":     appendDelta("text", ev.text);     break;
+          case "tool_call":     onEvToolCall(ev);    break;
+          case "tool_result":   onEvToolResult(ev);  break;
+          case "state_write":   onEvStateWrite(ev);  break;
+          case "render":        onEvRender(ev); src.close(); break;
+          case "error":         onEvError(ev); src.close();  break;
+        }
+      }
+
+      for (const t of ["request","llm_request","llm_delta","thinking_delta",
+                       "tool_call","tool_result","state_write","render","error"]) {
+        src.addEventListener(t, e => dispatch(e.data));
+      }
+      src.onmessage = e => dispatch(e.data);
+      src.onerror = () => { setStatus("connection lost", false); };
     }
 
-    src.onmessage = (e) => onMessage(e.data);
-    for (const t of ["request","llm_request","llm_delta","thinking_delta","tool_call","tool_result","state_write","render","error"]) {
-      src.addEventListener(t, (e) => onMessage(e.data));
+    // ── Navigation ───────────────────────────────────────────────
+    function navigate(method, url, body, extraHeaders) {
+      setStatus("loading " + url + "…", true);
+      const headers = Object.assign({}, extraHeaders);
+      if (document.cookie) headers["cookie"] = document.cookie;
+
+      fetch("/__slop/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method, url, body, headers }),
+      })
+        .then(r => r.json())
+        .then(({ rid }) => openStream(rid))
+        .catch(err => {
+          setStatus("submit error: " + err, false);
+        });
     }
-    src.onerror = () => { statusEl.textContent = "connection lost"; };
+
+    // ── Boot ─────────────────────────────────────────────────────
+    openStream(INITIAL_RID);
   </script>
 </body>
 </html>

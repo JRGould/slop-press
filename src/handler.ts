@@ -1,8 +1,8 @@
 import type { IncomingRequest, RenderResponse, SseEvent } from "./events.js";
 import { callLLM, pickModel, type ChatMessage } from "./llm.js";
-import { SYSTEM_PROMPT, buildUserMessage } from "./prompt.js";
+import { buildUserMessage } from "./prompt.js";
 import { TOOL_SCHEMAS, executeTool } from "./tools.js";
-import { readSessionsJson } from "./state.js";
+import { readSessionsJson, readSystemPrompt } from "./state.js";
 
 const MAX_TURNS = 6;
 
@@ -12,12 +12,16 @@ export async function handleRequest(
 ): Promise<RenderResponse> {
   onEvent?.({ type: "request", request });
 
-  const isAdmin = await detectAdmin(request);
+  const [isAdmin, systemPrompt, userMessage] = await Promise.all([
+    detectAdmin(request),
+    readSystemPrompt(),
+    buildUserMessage(request),
+  ]);
   const model = pickModel({ isAdmin });
 
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    await buildUserMessage(request),
+    { role: "system", content: systemPrompt },
+    userMessage,
   ];
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { SseEvent } from "./events.js";
+import process from "node:process";
 
 export type ChatMessage =
   | { role: "system"; content: string }
@@ -169,9 +170,7 @@ function extractReasoning(delta: unknown): string | null {
   return null;
 }
 
-export function pickModel(opts: {
-  isAdmin: boolean;
-}): string {
+export function pickModel(opts: { isAdmin: boolean }): string {
   const override = process.env.SLOPPRESS_MODEL;
   if (opts.isAdmin) {
     return process.env.SLOPPRESS_MODEL_ADMIN ?? override ?? "gpt-4o-mini";

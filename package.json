@@ -5,8 +5,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev": "NODE_OPTIONS='--disable-warning=DEP0040' tsx watch src/server.ts",
+    "start": "NODE_OPTIONS='--disable-warning=DEP0040' tsx src/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
@@ -18,7 +18,7 @@
     "openai": "^4.77.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^22.19.17",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

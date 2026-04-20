@@ -6,6 +6,7 @@ import {
   writeStateMd,
   writeSessionsJson,
 } from "./state.js";
+import { generateImage, bustImageCache } from "./images.js";
 
 export const TOOL_SCHEMAS: ToolSchema[] = [
   {
@@ -83,6 +84,57 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
           contents: {
             type: "string",
             description: "Full new contents of sessions.json (stringified JSON).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_image",
+      description:
+        "Generate an image and cache it to disk. Returns a URL you can use in an <img> tag. " +
+        "If an image with this cache_key already exists on disk, the cached version is returned instantly at no cost. " +
+        "The URL format is always /__images/<cache_key>.png — you can embed this URL in your HTML before calling this tool " +
+        "and they will both be processed in the same turn. " +
+        "Choose stable, descriptive cache_keys for site-wide images (e.g. 'site-hero', 'author-avatar') " +
+        "so they persist across requests. Use post-slug-based keys for per-post images (e.g. 'post-on-sandwiches-thumb').",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["cache_key", "prompt"],
+        properties: {
+          cache_key: {
+            type: "string",
+            description:
+              "Slug-like identifier for this image, e.g. 'site-hero', 'author-avatar', 'post-dvorak-thumb'. " +
+              "Only alphanumeric, hyphens, and underscores. Used as the filename (appended with .png).",
+          },
+          prompt: {
+            type: "string",
+            description:
+              "Text prompt describing the image to generate. Ignored if the cache_key already has a cached file.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "bust_image_cache",
+      description:
+        "Delete a cached image so it will be regenerated on the next generate_image call. " +
+        "Used from the admin images panel to replace stale or unwanted images.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["cache_key"],
+        properties: {
+          cache_key: {
+            type: "string",
+            description: "The cache_key of the image to delete.",
           },
         },
       },
@@ -181,6 +233,23 @@ export async function executeTool(
     const diff = simpleDiff(before, contents);
     onEvent?.({ type: "state_write", file: "sessions.json", diff });
     const result = { ok: true, bytes: contents.length };
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
+    return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
+  }
+
+  if (name === "generate_image") {
+    const a = args as { cache_key?: unknown; prompt?: unknown };
+    const cacheKey = typeof a.cache_key === "string" ? a.cache_key : "image";
+    const prompt = typeof a.prompt === "string" ? a.prompt : "";
+    const result = await generateImage(cacheKey, prompt);
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
+    return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
+  }
+
+  if (name === "bust_image_cache") {
+    const a = args as { cache_key?: unknown };
+    const cacheKey = typeof a.cache_key === "string" ? a.cache_key : "";
+    const result = await bustImageCache(cacheKey);
     onEvent?.({ type: "tool_result", id: toolCallId, name, result });
     return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
   }
