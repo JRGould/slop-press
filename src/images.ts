@@ -58,13 +58,17 @@ export async function generateImage(
   const model = process.env.SLOPPRESS_IMAGE_MODEL ?? "dall-e-3";
   try {
     const client = getImageClient();
-    const response = await client.images.generate({
+    const params: Record<string, unknown> = {
       model,
       prompt,
       n: 1,
       size: "1024x1024",
-      response_format: "b64_json",
-    });
+    };
+    // Only dall-e-* models accept response_format; gpt-image-1 always returns b64_json.
+    if (model.startsWith("dall-e")) {
+      params.response_format = "b64_json";
+    }
+    const response = await client.images.generate(params as Parameters<typeof client.images.generate>[0]);
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) {
       return {
