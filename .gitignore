@@ -1,10 +1,4 @@
+.claude/worktrees
 node_modules
 .env
-.env.local
-dist
-*.log
 .DS_Store
-
-# Runtime auth state — never commit live session tokens.
-# state.md is tracked as the seed/example; sessions.json is always runtime.
-state/sessions.json

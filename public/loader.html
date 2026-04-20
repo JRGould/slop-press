@@ -495,10 +495,24 @@
     }
 
     // ── Navigation ───────────────────────────────────────────────
-    function navigate(method, url, body, extraHeaders) {
+    function navigate(method, url, body, extraHeaders, fromPopState) {
       setStatus("loading " + url + "…", true);
       const headers = Object.assign({}, extraHeaders);
       if (document.cookie) headers["cookie"] = document.cookie;
+
+      // GET navigations update the URL bar and push a history entry so the
+      // browser back/forward buttons can move between pages. POSTs mirror
+      // browser behavior — the URL only changes when the handler's redirect
+      // follow-up (a GET) runs through navigate() again.
+      if (method === "GET" && !fromPopState) {
+        try {
+          const abs = new URL(url, window.location.href);
+          const target = abs.pathname + abs.search + abs.hash;
+          if (target !== window.location.pathname + window.location.search + window.location.hash) {
+            window.history.pushState({ slop: true, url: target }, "", target);
+          }
+        } catch {}
+      }
 
       fetch("/__slop/submit", {
         method: "POST",
@@ -512,7 +526,17 @@
         });
     }
 
+    window.addEventListener("popstate", () => {
+      const target = window.location.pathname + window.location.search;
+      navigate("GET", target, null, {}, true);
+    });
+
     // ── Boot ─────────────────────────────────────────────────────
+    // Anchor the initial history entry so the first back/forward lands here.
+    try {
+      const here = window.location.pathname + window.location.search + window.location.hash;
+      window.history.replaceState({ slop: true, url: here }, "", here);
+    } catch {}
     openStream(INITIAL_RID);
   </script>
 </body>
