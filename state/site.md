@@ -1,6 +1,6 @@
 ---
 title: SlopPress
-tagline: a CMS where the web server is an LLM
+tagline: a CMS whose web server is literally an LLM
 vibe: minimal personal blog, sans-serif, generous whitespace, subtle horizontal rules
 ---
 

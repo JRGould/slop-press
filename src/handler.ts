@@ -64,8 +64,9 @@ export async function handleRequest(
     }
 
     if (finalRender) {
-      onEvent?.({ type: "render", response: finalRender });
-      return finalRender;
+      const patched = fixupRedirect(finalRender, request);
+      onEvent?.({ type: "render", response: patched });
+      return patched;
     }
   }
 
@@ -110,6 +111,50 @@ async function detectAdmin(request: IncomingRequest): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function fixupRedirect(
+  response: RenderResponse,
+  request: IncomingRequest,
+): RenderResponse {
+  if (response.status < 300 || response.status >= 400) return response;
+  const headers = { ...(response.headers ?? {}) };
+  const hasLocation = Object.keys(headers).some(
+    (k) => k.toLowerCase() === "location",
+  );
+  if (hasLocation) return response;
+
+  // Infer a sensible Location from request + cookie state.
+  const sets = response.set_cookies ?? [];
+  const settingSession = sets.some((c) =>
+    /^sloppress_session=[^;\s]+/.test(c) && !/Max-Age=0/i.test(c),
+  );
+  const clearingSession = sets.some(
+    (c) => /^sloppress_session=/.test(c) && /Max-Age=0/i.test(c),
+  );
+
+  let loc = "/";
+  const url = request.url;
+  if (settingSession) {
+    loc = "/admin";
+  } else if (clearingSession) {
+    loc = "/";
+  } else if (url.startsWith("/admin/pages")) {
+    loc = "/admin/pages";
+  } else if (url.startsWith("/admin/posts")) {
+    loc = "/admin/posts";
+  } else if (url.startsWith("/admin/users")) {
+    loc = "/admin/users";
+  } else if (url.startsWith("/admin/images")) {
+    loc = "/admin/images";
+  } else if (url.startsWith("/admin")) {
+    loc = "/admin";
+  } else if (url === "/login") {
+    loc = "/login";
+  }
+
+  headers["Location"] = loc;
+  return { ...response, headers };
 }
 
 function escapeHtml(s: string): string {

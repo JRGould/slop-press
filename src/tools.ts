@@ -318,20 +318,6 @@ export async function executeTool(
 
   if (name === "render_response") {
     const response = coerceRenderResponse(args);
-    // Reject broken redirects so the LLM gets another chance to add a Location.
-    if (response.status >= 300 && response.status < 400) {
-      const hasLocation = Object.keys(response.headers ?? {}).some(
-        (k) => k.toLowerCase() === "location",
-      );
-      if (!hasLocation) {
-        return emitError(
-          toolCallId,
-          name,
-          `render_response with status ${response.status} requires a Location header. Example: { status: 302, headers: { "Location": "/admin" }, body: "" }. Call render_response again with the header set.`,
-          onEvent,
-        );
-      }
-    }
     const result = { ok: true, status: response.status };
     onEvent?.({ type: "tool_result", id: toolCallId, name, result });
     return {

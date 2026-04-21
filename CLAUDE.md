@@ -74,3 +74,11 @@ Falls back to `gpt-4o-mini`. Image generation uses `SLOPPRESS_IMAGE_MODEL` (defa
 - **`render_response` is always last.** The LLM loop returns a 500 if it exhausts 6 turns without calling it.
 - **Image URLs are deterministic.** `/__images/<cache_key>.png` — the LLM can embed the URL and call `generate_image` in the same turn.
 - The `loaderTemplateCache` in `server.ts` caches `loader.html` in memory. During local dev (`npm run dev`) this is fine; in Docker restart the container to pick up loader changes.
+
+## Verification
+
+Two dev environments can serve this app: `npm run dev` (tsx watch, hot-reload) and `docker compose up` (image rebuild required). They can drift — code edits only land in the tsx-watch process, not a running Docker container.
+
+- When the user reports "still doesn't work" after a fix, **first confirm which environment they're hitting** (port, URL, `docker ps`) before re-debugging the code. The fix may already be correct but served from a stale container.
+- After a code change, before declaring done, verify the new code is actually executing: check tsx reloaded, rebuild the Docker image if that's the target, or bust `loaderTemplateCache` / caches as needed.
+- `state/system-prompt.md` is the exception — it reloads per-request, no restart needed.

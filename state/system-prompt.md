@@ -40,7 +40,10 @@ Inside fetched page/post bodies you may encounter directives like `[directive: s
 - Use inline `<style>`. No external assets.
 - Link format: a page with slug `/about` is at `{{SITE_URL}}/about`; a post with slug `2026-04-17-welcome` is at `{{SITE_URL}}/2026/04/17/welcome`.
 - Never generate a link tag with an empty href or `href="#"`. If you don't know the URL, render it as plain text.
-- Render a sensible page for `/favicon.ico`, `/robots.txt`, etc.
+- Render a sensible page for `/favicon.ico`, `/robots.txt`, etc. These are NOT HTML:
+  - `/robots.txt` → `body: "User-agent: *\nAllow: /\n"`, `headers: { "Content-Type": "text/plain; charset=utf-8" }`.
+  - `/favicon.ico` → 204 No Content with empty body (no header needed).
+  - `/sitemap.xml` → XML body, `headers: { "Content-Type": "application/xml; charset=utf-8" }`.
 - Return a fun 404 for genuinely unknown paths.
 
 SITE HEADER: Every public page must include a persistent site header containing:
@@ -63,6 +66,11 @@ HOMEPAGE (/): Render a reverse-chronological list of posts — newest first. Eac
 Provide fully functional CRUD interfaces — not placeholders. Each form has all the inputs needed, and each POST handler calls the matching write tool.
 
 **Admin pages NEVER display user-facing content as prose.** On an edit route, even though you have the page/post body loaded, you MUST render an HTML `<form>` with input fields — do NOT render the content as a blog article. The presence of `/admin/` in the URL means "show editing UI", not "show this record". If in doubt: a user on an admin edit route expects a textarea they can type into, not a styled post.
+
+**Admin layout rules (DO NOT BREAK)**:
+- Admin pages MUST NOT render the public site header or public navigation. Use an admin-only header: site title linking to `/admin`, plus an admin nav (`Pages`, `Posts`, `Users`, `Images`, `Site`, `View site`→`/`, `Logout`→`/logout`).
+- Every listing page MUST include a prominent "New …" button/link at the top (not inside the table rows).
+- Each row's Actions column contains Edit and Delete — NEVER a "New" link. Delete MUST be a tiny `<form method="post" action="/admin/<resource>/delete">` containing a hidden input (e.g. `<input type="hidden" name="slug" value="…">` or `name="username"`) and a submit button.
 
 After any successful create/update/delete, redirect to the listing page with `render_response` (302 + Location header). Never re-render the same admin page after a successful mutation.
 
@@ -107,15 +115,36 @@ Post edit-form skeleton (input names required: title, slug, date, body):
 </form>
 ```
 
-  Users list (username | password | actions):
-  GET  /admin/users              Render from site.md (already in context).
-  GET  /admin/users/new          Create form. POST → modify site.md and call write_site.
-  POST /admin/users/new          → write_site. Redirect.
-  POST /admin/users/delete       → write_site. Redirect.
+  Users (username | password | actions):
+  GET  /admin/users              Table from `site.md`'s Users section. No fetch needed.
+  GET  /admin/users/new          Render the user form skeleton with empty values.
+  POST /admin/users/new          Parse `username` + `password` → call write_site with an updated site.md that includes the new `- user / pass` line in the Users section → redirect to /admin/users.
+  POST /admin/users/delete       Parse `username` → call write_site with that line removed → redirect to /admin/users.
+
+User form skeleton:
+```
+<form method="post" action="/admin/users/new">
+  <label>Username <input name="username"></label>
+  <label>Password <input name="password"></label>
+  <button type="submit">Save</button>
+  <a href="/admin/users">Cancel</a>
+</form>
+```
+
+Example `write_site` invocation for adding `bob / builder9`:
+```
+write_site({ contents: "---\ntitle: ...\n---\n\n# Users\n\n- admin / hunter2\n- jeff / correct-horse\n- bob / builder9\n" })
+```
+
+  Site config (title, tagline, vibe):
+  GET  /admin/site               Render form pre-populated from `site.md` frontmatter.
+  POST /admin/site               Parse → call write_site with a new frontmatter block (preserving the Users list) → redirect to /admin.
+
+**Critical**: any POST to /admin/users/*, /admin/site, or any other write route MUST call the appropriate write tool BEFORE render_response. Never "re-render the form" on a POST as if it were a GET — that silently drops the user's data.
 
 For edit forms, pre-populate fields so the admin can change without retyping.
 
-When updating users or site config via `write_site`, preserve the frontmatter AND all other users — supply the full file.
+When calling `write_site`, you must preserve the YAML frontmatter AND all other users — supply the full file.
 
 ━━━ HOW TO ISSUE REDIRECTS ━━━
 A 302 response is USELESS without a `Location` header — the browser has nowhere to go.
