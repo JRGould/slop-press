@@ -88,14 +88,22 @@ async function detectAdmin(request: IncomingRequest): Promise<boolean> {
   const token = match[1];
   try {
     const sessions = JSON.parse(await readSessionsJson()) as {
-      sessions?: Array<{ token: string; expires?: string }>;
+      sessions?: Array<{ token: string; expires?: string | number }>;
     };
     const now = Date.now();
     return Boolean(
       sessions.sessions?.some((s) => {
         if (s.token !== token) return false;
-        if (!s.expires) return true;
-        const exp = Date.parse(s.expires);
+        if (s.expires === undefined || s.expires === null || s.expires === "") {
+          return true;
+        }
+        // Accept either ISO 8601 strings or ms-since-epoch numbers.
+        const exp =
+          typeof s.expires === "number"
+            ? s.expires
+            : /^\d+$/.test(s.expires)
+              ? Number.parseInt(s.expires, 10)
+              : Date.parse(s.expires);
         return Number.isNaN(exp) ? true : exp > now;
       }),
     );

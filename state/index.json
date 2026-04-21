@@ -1,0 +1,39 @@
+{
+  "pages": [
+    {
+      "slug": "/about",
+      "title": "About SlopPress",
+      "excerpt": "SlopPress is a tiny experiment in radical compression: one markdown file, one server, one improvised brain. It takes the usual sprawl of a…",
+      "updated_at": "2026-04-21T02:19:22.101Z"
+    },
+    {
+      "slug": "/contact",
+      "title": "/contact",
+      "excerpt": "A contact page with a mailto link (jeff@example.com). A \"send message\" form that doesn't actually submit anywhere — just echoes the input…",
+      "updated_at": "2026-04-21T00:58:10.561Z"
+    }
+  ],
+  "posts": [
+    {
+      "slug": "2026-04-18-introducing-sloppress",
+      "title": "Introducing: SlopPress",
+      "date": "2026-04-18",
+      "excerpt": "SlopPress is a revolutionary new CMS that uses the power of AI to continue the copy in a playful, slightly grandiose way, as if the system…",
+      "updated_at": "2026-04-21T00:58:10.570Z"
+    },
+    {
+      "slug": "2026-04-10-on-sandwiches",
+      "title": "On sandwiches",
+      "date": "2026-04-10",
+      "excerpt": "A short meditation on the Italian sub. 250 words, warm, a little silly.",
+      "updated_at": "2026-04-21T00:58:10.567Z"
+    },
+    {
+      "slug": "2026-04-02-why-i-switched-to-dvorak",
+      "title": "Why I switched to dvorak",
+      "date": "2026-04-02",
+      "excerpt": "Cautionary tale. Narrator regrets the switch. Ends on a hopeful note about returning to qwerty.",
+      "updated_at": "2026-04-21T00:58:10.569Z"
+    }
+  ]
+}

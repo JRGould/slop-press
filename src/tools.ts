@@ -1,11 +1,19 @@
 import type { ToolSchema } from "./llm.js";
 import type { RenderResponse, SseEvent } from "./events.js";
 import {
-  readStateMd,
   readSessionsJson,
-  writeStateMd,
   writeSessionsJson,
 } from "./state.js";
+import {
+  readPage,
+  readPost,
+  writePage,
+  writePost,
+  deletePage,
+  deletePost,
+  readSiteMd,
+  writeSiteMd,
+} from "./content.js";
 import { generateImage, bustImageCache } from "./images.js";
 
 export const TOOL_SCHEMAS: ToolSchema[] = [
@@ -52,10 +60,140 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   {
     type: "function",
     function: {
-      name: "write_state",
+      name: "read_pages",
       description:
-        "Overwrite state.md with new contents. Use for admin edits (adding/editing pages, posts, users, site config). " +
-        "You must supply the entire new file.",
+        "Fetch the full body of one or more pages by slug. The manifest in the user message lists available slugs. " +
+        "Returns { pages: [{ slug, title, body, updated_at }], missing: [slug] }. " +
+        "Batch slugs into a single call when possible to save turns.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["slugs"],
+        properties: {
+          slugs: {
+            type: "array",
+            items: { type: "string" },
+            description: "Page slugs to fetch, e.g. [\"/about\", \"/contact\"].",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_posts",
+      description:
+        "Fetch the full body of one or more posts by id. The manifest lists available post ids (e.g. \"2026-04-10-on-sandwiches\"). " +
+        "Returns { posts: [{ slug, title, date, body, updated_at }], missing: [slug] }. " +
+        "Batch ids into a single call when possible to save turns.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["slugs"],
+        properties: {
+          slugs: {
+            type: "array",
+            items: { type: "string" },
+            description: "Post ids to fetch.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_page",
+      description:
+        "Create or update a single page. Overwrites any existing page with the same slug. " +
+        "The manifest and the page file are both updated atomically. " +
+        "Only pass the fields for THIS page — other pages are untouched.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["slug", "title", "body"],
+        properties: {
+          slug: {
+            type: "string",
+            description: "Page slug starting with /, e.g. \"/about\".",
+          },
+          title: { type: "string" },
+          body: {
+            type: "string",
+            description: "Full markdown body of the page.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_post",
+      description:
+        "Create or update a single post. Overwrites any existing post with the same slug id. " +
+        "Only pass the fields for THIS post — other posts are untouched.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["slug", "title", "date", "body"],
+        properties: {
+          slug: {
+            type: "string",
+            description:
+              "Post id, typically \"YYYY-MM-DD-slugified-title\", e.g. \"2026-04-18-introducing-sloppress\".",
+          },
+          title: { type: "string" },
+          date: {
+            type: "string",
+            description: "Publication date in YYYY-MM-DD.",
+          },
+          body: {
+            type: "string",
+            description: "Full markdown body of the post.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_page",
+      description: "Delete a page by slug. The manifest is updated.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["slug"],
+        properties: {
+          slug: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_post",
+      description: "Delete a post by slug id. The manifest is updated.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["slug"],
+        properties: {
+          slug: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_site",
+      description:
+        "Overwrite site.md (site config frontmatter + Users list). Use for config edits, adding/removing users, or changing the password. " +
+        "You must supply the entire new file contents.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -63,7 +201,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
         properties: {
           contents: {
             type: "string",
-            description: "Full new contents of state.md.",
+            description: "Full new contents of site.md.",
           },
         },
       },
@@ -155,6 +293,11 @@ export type ExecutedTool =
       resultJson: string;
     }
   | {
+      kind: "read";
+      toolCallId: string;
+      resultJson: string;
+    }
+  | {
       kind: "error";
       toolCallId: string;
       resultJson: string;
@@ -170,44 +313,147 @@ export async function executeTool(
   try {
     args = JSON.parse(rawArgs || "{}");
   } catch {
-    const result = { error: "invalid JSON in tool arguments" };
-    onEvent?.({
-      type: "tool_result",
-      id: toolCallId,
-      name,
-      result,
-    });
+    return emitError(toolCallId, name, "invalid JSON in tool arguments", onEvent);
+  }
+
+  if (name === "render_response") {
+    const response = coerceRenderResponse(args);
+    // Reject broken redirects so the LLM gets another chance to add a Location.
+    if (response.status >= 300 && response.status < 400) {
+      const hasLocation = Object.keys(response.headers ?? {}).some(
+        (k) => k.toLowerCase() === "location",
+      );
+      if (!hasLocation) {
+        return emitError(
+          toolCallId,
+          name,
+          `render_response with status ${response.status} requires a Location header. Example: { status: 302, headers: { "Location": "/admin" }, body: "" }. Call render_response again with the header set.`,
+          onEvent,
+        );
+      }
+    }
+    const result = { ok: true, status: response.status };
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
     return {
-      kind: "error",
+      kind: "render",
+      response,
       toolCallId,
       resultJson: JSON.stringify(result),
     };
   }
 
-  if (name === "render_response") {
-    const response = coerceRenderResponse(args);
-    onEvent?.({
-      type: "tool_result",
-      id: toolCallId,
-      name,
-      result: { ok: true, status: response.status },
-    });
-    return {
-      kind: "render",
-      response,
-      toolCallId,
-      resultJson: JSON.stringify({ ok: true, status: response.status }),
-    };
+  if (name === "read_pages") {
+    const slugs = asStringArray((args as { slugs?: unknown }).slugs);
+    const pages: unknown[] = [];
+    const missing: string[] = [];
+    for (const s of slugs) {
+      const rec = await readPage(s);
+      if (rec) pages.push(rec);
+      else missing.push(s);
+    }
+    const result = { pages, missing };
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
+    return { kind: "read", toolCallId, resultJson: JSON.stringify(result) };
   }
 
-  if (name === "write_state") {
-    const contents = typeof (args as { contents?: unknown }).contents === "string"
-      ? ((args as { contents: string }).contents)
-      : "";
-    const before = await readStateMd();
-    await writeStateMd(contents);
-    const diff = simpleDiff(before, contents);
-    onEvent?.({ type: "state_write", file: "state.md", diff });
+  if (name === "read_posts") {
+    const slugs = asStringArray((args as { slugs?: unknown }).slugs);
+    const posts: unknown[] = [];
+    const missing: string[] = [];
+    for (const s of slugs) {
+      const rec = await readPost(s);
+      if (rec) posts.push(rec);
+      else missing.push(s);
+    }
+    const result = { posts, missing };
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
+    return { kind: "read", toolCallId, resultJson: JSON.stringify(result) };
+  }
+
+  if (name === "write_page") {
+    const a = args as { slug?: unknown; title?: unknown; body?: unknown };
+    if (typeof a.slug !== "string" || typeof a.title !== "string" || typeof a.body !== "string") {
+      return emitError(toolCallId, name, "slug, title, body (all strings) required", onEvent);
+    }
+    const rec = await writePage({ slug: a.slug, title: a.title, body: a.body });
+    onEvent?.({ type: "state_write", file: `pages/${rec.slug}`, diff: `wrote page ${rec.slug}` });
+    const result = { ok: true, slug: rec.slug, updated_at: rec.updated_at };
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
+    return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
+  }
+
+  if (name === "write_post") {
+    const a = args as {
+      slug?: unknown;
+      title?: unknown;
+      date?: unknown;
+      body?: unknown;
+    };
+    if (
+      typeof a.slug !== "string" ||
+      typeof a.title !== "string" ||
+      typeof a.date !== "string" ||
+      typeof a.body !== "string"
+    ) {
+      return emitError(
+        toolCallId,
+        name,
+        "slug, title, date, body (all strings) required",
+        onEvent,
+      );
+    }
+    const rec = await writePost({
+      slug: a.slug,
+      title: a.title,
+      date: a.date,
+      body: a.body,
+    });
+    onEvent?.({ type: "state_write", file: `posts/${rec.slug}`, diff: `wrote post ${rec.slug}` });
+    const result = { ok: true, slug: rec.slug, updated_at: rec.updated_at };
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
+    return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
+  }
+
+  if (name === "delete_page") {
+    const slug = (args as { slug?: unknown }).slug;
+    if (typeof slug !== "string") {
+      return emitError(toolCallId, name, "slug (string) required", onEvent);
+    }
+    const ok = await deletePage(slug);
+    onEvent?.({
+      type: "state_write",
+      file: `pages/${slug}`,
+      diff: ok ? `deleted page ${slug}` : `page ${slug} not found`,
+    });
+    const result = { ok, slug };
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
+    return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
+  }
+
+  if (name === "delete_post") {
+    const slug = (args as { slug?: unknown }).slug;
+    if (typeof slug !== "string") {
+      return emitError(toolCallId, name, "slug (string) required", onEvent);
+    }
+    const ok = await deletePost(slug);
+    onEvent?.({
+      type: "state_write",
+      file: `posts/${slug}`,
+      diff: ok ? `deleted post ${slug}` : `post ${slug} not found`,
+    });
+    const result = { ok, slug };
+    onEvent?.({ type: "tool_result", id: toolCallId, name, result });
+    return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
+  }
+
+  if (name === "write_site") {
+    const contents = (args as { contents?: unknown }).contents;
+    if (typeof contents !== "string") {
+      return emitError(toolCallId, name, "contents (string) required", onEvent);
+    }
+    const before = await readSiteMd();
+    await writeSiteMd(contents);
+    onEvent?.({ type: "state_write", file: "site.md", diff: simpleDiff(before, contents) });
     const result = { ok: true, bytes: contents.length };
     onEvent?.({ type: "tool_result", id: toolCallId, name, result });
     return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
@@ -220,13 +466,7 @@ export async function executeTool(
     try {
       JSON.parse(contents);
     } catch {
-      const result = { error: "sessions.json contents must be valid JSON" };
-      onEvent?.({ type: "tool_result", id: toolCallId, name, result });
-      return {
-        kind: "error",
-        toolCallId,
-        resultJson: JSON.stringify(result),
-      };
+      return emitError(toolCallId, name, "sessions.json contents must be valid JSON", onEvent);
     }
     const before = await readSessionsJson();
     await writeSessionsJson(contents);
@@ -254,9 +494,23 @@ export async function executeTool(
     return { kind: "mutation", toolCallId, resultJson: JSON.stringify(result) };
   }
 
-  const result = { error: `unknown tool: ${name}` };
+  return emitError(toolCallId, name, `unknown tool: ${name}`, onEvent);
+}
+
+function emitError(
+  toolCallId: string,
+  name: string,
+  message: string,
+  onEvent?: (event: SseEvent) => void,
+): ExecutedTool {
+  const result = { error: message };
   onEvent?.({ type: "tool_result", id: toolCallId, name, result });
   return { kind: "error", toolCallId, resultJson: JSON.stringify(result) };
+}
+
+function asStringArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === "string");
 }
 
 function coerceRenderResponse(args: unknown): RenderResponse {

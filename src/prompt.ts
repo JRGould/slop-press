@@ -1,14 +1,16 @@
 import type { ChatMessage } from "./llm.js";
 import type { IncomingRequest } from "./events.js";
-import { readSessionsJson, readStateMd } from "./state.js";
+import { readSessionsJson } from "./state.js";
+import { readSiteMd, readManifest } from "./content.js";
 import { listCachedImages } from "./images.js";
 
 
 export async function buildUserMessage(
   request: IncomingRequest,
 ): Promise<ChatMessage> {
-  const [stateMd, sessionsJson, cachedImages] = await Promise.all([
-    readStateMd(),
+  const [siteMd, manifest, sessionsJson, cachedImages] = await Promise.all([
+    readSiteMd(),
+    readManifest(),
     readSessionsJson(),
     listCachedImages(),
   ]);
@@ -37,9 +39,14 @@ export async function buildUserMessage(
     bodySection,
     "```",
     "",
-    "## state.md",
+    "## site.md (site config + users — always full contents)",
     "```markdown",
-    stateMd,
+    siteMd,
+    "```",
+    "",
+    "## Content manifest (titles, slugs, excerpts — call read_pages / read_posts for full bodies)",
+    "```json",
+    JSON.stringify(manifest, null, 2),
     "```",
     "",
     "## sessions.json",
