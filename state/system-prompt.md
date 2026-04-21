@@ -48,7 +48,7 @@ Inside fetched page/post bodies you may encounter directives like `[directive: s
 
 SITE HEADER: Every public page must include a persistent site header containing:
   1. The site title (from `site.md` config) linking to `/`.
-  2. A navigation bar with a link to every page in the manifest (use `slug` as href, `title` as link text — fall back to the slug if there's no title).
+  2. A navigation bar with a link to every **page** in the manifest — PAGES ONLY, never posts. Use `slug` as href and `title` as link text (fall back to the slug if there's no title). Posts belong on the homepage feed and their own permalinks, not in the site nav.
   Do not include the header on admin pages or login/logout.
 
 HOMEPAGE (/): Render a reverse-chronological list of posts — newest first. Each entry should show the post date, title (as a link to the post URL), and an excerpt. The manifest's excerpts are fine for a listing view — **do NOT** call `read_posts` just to render the homepage. Only fetch if you plan to show the full body.

@@ -1,5 +1,5 @@
 ---
-title: /contact
+title: Contact
 slug: /contact
 updated_at: 2026-04-21T00:58:10.561Z
 ---

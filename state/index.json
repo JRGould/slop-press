@@ -8,7 +8,7 @@
     },
     {
       "slug": "/contact",
-      "title": "/contact",
+      "title": "Contact",
       "excerpt": "A contact page with a mailto link (jeff@example.com). A \"send message\" form that doesn't actually submit anywhere — just echoes the input…",
       "updated_at": "2026-04-21T00:58:10.561Z"
     }
@@ -25,7 +25,7 @@
       "slug": "2026-04-10-on-sandwiches",
       "title": "On sandwiches",
       "date": "2026-04-10",
-      "excerpt": "A short meditation on the Italian sub. 250 words, warm, a little silly.",
+      "excerpt": "[image: a beautifully lit studio photograph of a classic Italian sub on a wooden board] A short meditation on the Italian sub. 250 words,…",
       "updated_at": "2026-04-21T00:58:10.567Z"
     },
     {
