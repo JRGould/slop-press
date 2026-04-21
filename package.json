@@ -10,7 +10,8 @@
     "docker:dev": "SLOPPRESS_DEV_MODE=true docker compose up --build",
     "docker:run": "docker compose up --build",
     "docker:down": "docker compose down",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate": "tsx --env-file=.env scripts/generate-static.ts"
   },
   "engines": {
     "node": ">=22"
