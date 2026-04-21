@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/logo.png" alt="SlopPress logo" width="180">
+</p>
+
 # SlopPress
 
 A CMS where the web server **is** an LLM.
