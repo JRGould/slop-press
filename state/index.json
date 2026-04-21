@@ -15,6 +15,20 @@
   ],
   "posts": [
     {
+      "slug": "2026-04-20-a-field-guide-to-directives",
+      "title": "A Field Guide to SlopPress Directives",
+      "date": "2026-04-20",
+      "excerpt": "Directives are the little embedded instructions SlopPress resolves on the fly. Drop one into any post body and the server fills it in as it…",
+      "updated_at": ""
+    },
+    {
+      "slug": "2026-04-19-the-lighthouse-at-nothing-point",
+      "title": "The Lighthouse at Nothing Point",
+      "date": "2026-04-19",
+      "excerpt": "A short piece of flash fiction, stitched together with directives. The bones are here; the model colors it in. [image: a moody…",
+      "updated_at": ""
+    },
+    {
       "slug": "2026-04-18-introducing-sloppress",
       "title": "Introducing: SlopPress",
       "date": "2026-04-18",

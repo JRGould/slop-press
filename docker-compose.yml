@@ -9,6 +9,9 @@ services:
     environment:
       PORT: "8080"
       HOST: "0.0.0.0"
+      # Override from the shell via `npm run docker:dev` / `docker:run`.
+      # Values here beat whatever `.env` sets for the same key.
+      SLOPPRESS_DEV_MODE: "${SLOPPRESS_DEV_MODE:-false}"
     # Read-only root FS. The only writable path is the bind-mounted state dir.
     read_only: true
     tmpfs:

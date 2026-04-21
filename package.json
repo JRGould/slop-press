@@ -5,8 +5,11 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "NODE_OPTIONS='--disable-warning=DEP0040' tsx watch src/server.ts",
-    "start": "NODE_OPTIONS='--disable-warning=DEP0040' tsx src/server.ts",
+    "dev": "NODE_OPTIONS='--disable-warning=DEP0040' tsx watch --env-file=.env src/server.ts",
+    "start": "NODE_OPTIONS='--disable-warning=DEP0040' tsx --env-file=.env src/server.ts",
+    "docker:dev": "SLOPPRESS_DEV_MODE=true docker compose up --build",
+    "docker:run": "SLOPPRESS_DEV_MODE=false docker compose up --build",
+    "docker:down": "docker compose down",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
