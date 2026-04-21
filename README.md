@@ -14,7 +14,12 @@ Each refresh is re-improvised. The vibes drift. That's the point.
 1. Copy `.env.example` to `.env` and fill in `OPENAI_API_KEY` (any
    OpenAI-compatible endpoint works — OpenAI, Ollama, LM Studio, vLLM, or
    Anthropic's OpenAI-compat endpoint).
-2. `docker compose up --build`
+2. Pick one:
+   - `npm install && npm run dev` — local tsx watcher, dev mode (activity panel) on, hot-reloads on file change.
+   - `npm start` — local tsx, dev mode off.
+   - `npm run docker:dev` — containerized, dev mode on.
+   - `npm run docker:run` — containerized, production-like, dev mode off.
+   - `npm run docker:down` — stop the container.
 3. Open <http://localhost:8080>.
 
 Localhost-only by default. Don't expose this to the internet — user
@@ -22,31 +27,38 @@ passwords live in a markdown file and the LLM judges login attempts.
 
 ## Dev mode (show thinking)
 
-Set `SLOPPRESS_DEV_MODE=true` in `.env`. Every page load now returns a tiny
-SPA wrapper that streams the LLM's activity — the request envelope, model
-messages, thinking tokens (if the model exposes them), tool calls, state
-diffs — then hot-swaps the final HTML into the document when the LLM calls
-`render_response`.
+`npm run dev` and `npm run docker:dev` flip `SLOPPRESS_DEV_MODE=true`. Every
+page load returns a tiny SPA wrapper that streams the LLM's activity — the
+request envelope, model messages, thinking tokens (if the model exposes
+them), tool calls, state diffs — then hot-swaps the final HTML into the
+document when the LLM calls `render_response`. The flag lives in the npm
+scripts, not in `.env`.
 
-## The three tools the LLM has
+## The tools the LLM has
 
 | Tool | Effect |
 |---|---|
 | `render_response({ status, headers, body, set_cookies })` | Terminal. Sends the HTTP response. |
-| `write_state({ contents })` | Overwrite `state/state.md`. Used for admin edits. |
-| `write_sessions({ contents })` | Overwrite `state/sessions.json`. Used for login/logout. |
+| `read_pages({ slugs })` / `read_posts({ slugs })` | Fetch full bodies on demand — the default payload only carries the manifest. |
+| `write_page` / `write_post` / `delete_page` / `delete_post` | Create/update/remove one record. The manifest rebuilds automatically. |
+| `write_site({ contents })` | Overwrite `state/site.md` (site config + users list). |
+| `write_sessions({ contents })` | Overwrite `state/sessions.json` (login/logout). |
+| `generate_image({ cache_key, prompt })` / `bust_image_cache` | Produce / invalidate images served from `/__images/<key>.png`. |
 
-That's it. Everything else the LLM invents.
+Everything else — routing, layout, styling, auth checks, 404 copy — the LLM invents each request.
 
 ## Source of truth
 
-Two files under `state/`:
+Everything under `state/`:
 
-- `state.md` — site config, page/post sketches, users with cleartext
-  passwords. The LLM treats this as source *material*, not a template.
+- `site.md` — site config frontmatter (title, tagline, vibe) + the Users list with cleartext passwords.
+- `pages/*.md`, `posts/*.md` — one markdown file per record. Front-matter holds metadata; the body can contain `[imagine: …]`, `[continue]`, and `[image: …]` directives that the LLM resolves at render time.
+- `index.json` — auto-generated manifest (titles, slugs, excerpts). Rebuilt on every write; always shipped to the LLM so it can route without reading every file.
 - `sessions.json` — currently-valid auth sessions.
+- `system-prompt.md` — the LLM's brief. Re-read per request; edit freely without restarting.
+- `images/*.png` — cached generated images.
 
-Edit either by hand or let the LLM rewrite them through the admin UI.
+Edit files by hand or let the LLM rewrite them through the admin UI.
 
 ## Model routing
 
