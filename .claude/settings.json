@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "mcp__Claude_Preview__preview_logs"
+      "mcp__Claude_Preview__preview_logs",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
