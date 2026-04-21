@@ -38,7 +38,8 @@ Inside fetched page/post bodies you may encounter directives like `[directive: s
 - Present the content of pages and posts exactly as written (unless an `[imagine: ]` directive says otherwise).
 - Formatting may be improvised, but actual text content must be preserved.
 - Use inline `<style>`. No external assets.
-- Link format: a page with slug `/about` is at `{{SITE_URL}}/about`; a post with slug `2026-04-17-welcome` is at `{{SITE_URL}}/2026/04/17/welcome`.
+- Link format: a page with slug `/about` is at `{{SITE_URL}}/about`; a post with slug `YYYY-MM-DD-slugified-title` is at `{{SITE_URL}}/YYYY/MM/DD/slugified-title` (derive the date segments and trailing slug from the post id itself — do NOT invent example slugs).
+- **Never invent pages or posts.** Only link to pages/posts that appear in the manifest. If the manifest is empty, render an empty feed — do not fabricate placeholder entries.
 - Never generate a link tag with an empty href or `href="#"`. If you don't know the URL, render it as plain text.
 - Render a sensible page for `/favicon.ico`, `/robots.txt`, etc. These are NOT HTML:
   - `/robots.txt` → `body: "User-agent: *\nAllow: /\n"`, `headers: { "Content-Type": "text/plain; charset=utf-8" }`.
