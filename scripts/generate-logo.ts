@@ -11,11 +11,12 @@ slightly absurd CMS where a Large Language Model acts as the web server.
 Visual concept: a stylized quill or pen nib dripping a single glossy drop
 of colorful ink onto an open book or document, with the drop subtly
 fragmenting into pixelated cubes mid-fall — suggesting "slop" becoming
-"press". Warm off-white background, bold confident linework, soft ink-wash
-shading, limited palette (deep ink-black, a single accent of teal or
-mustard). Square composition, centered subject, generous whitespace, no
-text or letters anywhere in the image. Flat modern editorial illustration
-style, reminiscent of a refined indie publication mark.`;
+"press". Pure opaque #FFFFFF white background (no transparency), bold
+confident linework, soft ink-wash shading, limited palette (deep ink-black,
+a single accent of teal or mustard). Square composition, centered subject,
+generous whitespace margin around the mark, no text or letters anywhere
+in the image. Flat modern editorial illustration style, reminiscent of a
+refined indie publication mark.`;
 
 async function main() {
   const apiKey = process.env.SLOPPRESS_IMAGE_API_KEY ?? process.env.OPENAI_API_KEY;

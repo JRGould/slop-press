@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="public/logo.png" alt="SlopPress logo" width="180">
-</p>
+<img src="public/logo.png" alt="SlopPress logo" width="100%">
 
 # SlopPress
 
